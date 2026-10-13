@@ -1005,13 +1005,21 @@ def make_pseudobulk(adata,
     meta_pseudobulk['ncells'] = idx_pseudobulk['id_bulk'].value_counts()[meta_pseudobulk.index]
     _log(f"{len(meta_pseudobulk)} pseudobulks generated (avg {meta_pseudobulk['ncells'].mean():.1f} cells each).")
     
-    from .py_util import summarize_numeric_matrix
     if layer is None or layer not in adata.layers.keys():
         counts_sc = adata.X
     else:
         counts_sc = adata.layers[layer]
     _log(f"Aggregating counts (method='{use}')...")
-    counts = summarize_numeric_matrix(counts_sc, group = idx_pseudobulk['id_bulk'], use_mean=(use=='mean'))
+    from scipy import sparse
+    bulk_id = idx_pseudobulk['id_bulk'].astype("category").cat.categories
+    bulk_codes = pd.Categorical(idx_pseudobulk['id_bulk'], categories=bulk_id).codes
+    membership = sparse.csr_matrix(
+        (np.ones(len(bulk_codes)), (bulk_codes, np.arange(len(bulk_codes)))),
+        shape=(len(bulk_id), len(bulk_codes))
+    )
+    if use == 'mean':
+        membership = sparse.diags(1 / np.asarray(membership.sum(axis=1)).ravel()) @ membership
+    counts = membership @ counts_sc
     if force_int:
         from scipy.sparse import spmatrix
         from scipy.sparse import csr_matrix
@@ -1019,7 +1027,6 @@ def make_pseudobulk(adata,
             counts = csr_matrix(counts, dtype='int')
         else:
             counts = np.array(counts).astype(int)
-    bulk_id = idx_pseudobulk['id_bulk'].astype("category").cat.categories
     adata_bulk = anndata.AnnData(X = counts, obs = meta_pseudobulk.loc[bulk_id,:], var = adata.var.copy())
     _log(f"Done. AnnData pseudobulk: {adata_bulk.shape[0]} x {adata_bulk.shape[1]}.")
     

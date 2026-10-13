@@ -4,6 +4,23 @@ This repository is a collection of Python helpers and analysis scripts for
 single-cell genomic data. Most routines use `AnnData`/Scanpy objects or
 NumPy/SciPy matrices. The files are standalone modules rather than a packaged
 library; import a function from its file or run a script where noted.
+The modules are intentionally kept as separate top-level files so an analysis
+can import only the module it needs, without importing this repository as one
+package.
+
+To import a helper from an analysis script, add this directory to `sys.path`
+and import from the corresponding file:
+
+```python
+import sys
+
+sys.path.insert(0, "/path/to/util_single_cell_public")
+from py_util import select_subset_cells
+from differential_expression import make_pseudobulk
+```
+
+Install the dependencies required by the selected module and workflow in that
+analysis environment; the modules do not declare a shared dependency set.
 
 ## Contents
 
@@ -179,13 +196,25 @@ though the helper also detects a CPU device.
 
 ## Dependencies and usage notes
 
+Dependencies are required per module rather than collected into one
+repository-wide environment. Some are imported only when a particular method
+is called.
+
+| File | Main dependencies | Additional workflow-specific dependencies |
+| --- | --- | --- |
+| `py_util.py` | NumPy, pandas, SciPy, scikit-learn, Scanpy, AnnData, igraph | `geosketch` for sketch-based cell selection |
+| `py_wknn.py` | NumPy, pandas, SciPy, Scanpy, AnnData, PyTorch, PyNNDescent, tqdm | `joblib` for parallel correlation; cuML for optional GPU neighbors |
+| `differential_expression.py` | NumPy, pandas, SciPy, statsmodels, joblib, tqdm | `formulaic` for parametric ANCOVA/variance decomposition; AnnData for pseudobulk; Scanpy and AnnData for cluster merging |
+| `cell_type_composition.py` | NumPy, pandas | scikit-learn for multinomial modeling |
+| `build_VAE_models.py` | Dependencies are imported by method | `scvi-tools` for SCVI/SCANVI, `scArches` for scPoli, AnnData and pandas for artificial labels; tqdm for progress; Matplotlib for loss plots |
+| `mapping_scarches.py` | scvi-tools, scArches, AnnData, NumPy, pandas, SciPy | Required for the SCVI/SCANVI/scPoli mapping workflows |
+| `run_scvelo_pt.py` | scVelo, SciPy | Required for velocity and pseudotime analysis |
+| `displacement_field.py` | PyTorch, PyTorch Lightning, NumPy, scikit-learn, tqdm | Compatible GPU setup for fitting as currently configured |
+
 There is no dependency manifest or project-level test suite in the repository.
-The modules import scientific Python packages including NumPy, pandas, SciPy,
-scikit-learn, Scanpy, AnnData, igraph, PyNNDescent, scVelo, scvi-tools,
-scArches, and (for the displacement model) PyTorch and PyTorch Lightning.
-Some optional paths use geosketch, cuML, joblib, formulaic, statsmodels, and
-tqdm. Install the packages needed by the specific module and workflow you
-intend to use.
+Keep incompatible analysis workflows in separate environments when their
+dependency versions conflict; adding the repository directory to `sys.path`
+and importing a single file avoids importing the other modules.
 
 Several functions operate on or update `AnnData` objects and assume that
 metadata columns, layers, representations, and category levels named in their
